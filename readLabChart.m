@@ -3,9 +3,7 @@ function t = readLabChart (filename,varargin)
 % a TS object for easy analysis and visualization.
 %
 % filename: the file name of the exported .mat file
-% block: index of block to be imported, e.g., 1
-% channels: indexes of channels to be imported, one channel for response, 
-% one channel for stimulus, e.g., [1,3]
+% block: index of block to be imported, e.g., 1 
 % interval: specific time interval, e.g., [100,320]
 
 p = inputParser;
@@ -15,14 +13,14 @@ p.addRequired('filename');
 % optional arguments: block, default 1; channel, default [1,2]; interval,
 % default [];
 p.addOptional('block',1);
-p.addOptional('channels',[1,2]);
 p.addOptional('interval',[]);
 
+% p.addOptional('channels',[1,2]);
 % parse varargin
 p.parse(filename,varargin{:});
 block    = p.Results.block;
-channels = p.Results.channels;
 interval = p.Results.interval;
+% channels = p.Results.channels;
 
 % load the .mat file
 temp = load(filename,'data','dataend','datastart','samplerate');
@@ -30,38 +28,62 @@ temp = load(filename,'data','dataend','datastart','samplerate');
 % get samplerate
 samplerate = temp.samplerate(1,1);
 
+%%
 % in the loaded files, all original datapoints from all blocks and
 % all channels are combined to single file, temp.data; to extract
 % datapoints for specific blocks and channels, use temp.datastart and
 % temp.dataend. Each column represents each block, each row represents each
 % channel.
+% for example, there are 2 blocks, 4 channels in the following data.
+% datastart =
+%           1     9032001
+%     2258001    11173801
+%     4516001    13315601
+%     6774001    15457401
+%
+% by defaut, channel 1 is the response, other channels are stimulus, for
+% example, voltage/current pulus, white light etc. For special experiments,
+% multi-channels for responses, in the inputparser, another parameter could
+% be define to separte the response and stimulus.
+
+% channels
+c = size(temp.datastart,1);
 
 % if interval is defaut as empty, read the whole block
 if isempty(interval)
-    resp = temp.data(temp.datastart(channels(1),block):temp.dataend(channels(1),block));
-    stim = temp.data(temp.datastart(channels(2),block):temp.dataend(channels(2),block));
+    resp = temp.data(temp.datastart(1,block):temp.dataend(1,block));
+    for i = 2:c
+        s(:,i-1) = temp.data(temp.datastart(i,block):temp.dataend(i,block));
+    end
+    stim = sum(s,2);
 else
     interval = interval * samplerate;
     % n of interval
     n = size(interval,1);
-    
     % response
-    rpoints = interval + temp.datastart(channels(1),block);
+    rpoints = interval + temp.datastart(1,block);
     % stimulus
-    spoints = interval + temp.datastart(channels(2),block);
+    for i = 1:c-1
+    spoints(:,:,i) = interval + temp.datastart(i+1,block);
+    end
     
     % read intervals and concatenate them
     resp    =[];
     stim    =[];
-    for i = 1:n
+    for i = 1:n % interval
         d = temp.data(rpoints(i,1):rpoints(i,2));
         resp = cat(2,resp,d);
-        s = temp.data(spoints(i,1):spoints(i,2));
-        stim = cat(2,stim,s);
+        for j = 1:c-1 % channel
+        s(:,j) = temp.data(spoints(i,1,j):spoints(i,2,j));
+        end
+        stim = cat(2,stim,sum(s,2));
     end
 end
 
 % generate a TS object and plot the raw data
 t = TS(resp,stim);
-% figure; t.plt;
+% detect stimulus
+t.detectSti(0.1);
+% plot
+figure; t.plt;
 end

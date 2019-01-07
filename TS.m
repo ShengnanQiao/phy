@@ -1,5 +1,5 @@
 classdef TS < handle
-    % Define a class for processing time-series electrophysiological or imaging data
+    % Define a class for processing time-series electrophysiological 
     properties (Access = public)
         
         % resp: data for cell responses, including raw data, metadata and statistics;
@@ -284,14 +284,14 @@ classdef TS < handle
             p = inputParser;
             
             p.addOptional ('method', '');
-%             p.addParameter('tracelength',[]);
-                        p.addParameter('sti',[]);
+            p.addParameter('sti',[]);
+            p.addOptional('pat',[]);
             p.parse(varargin{:});
             
             method= p.Results.method;
 %             tracelength = p.Results.tracelength;
             sti = p.Results.sti;
-            
+            pat = p.Results.pat;
             
             
             if isempty(method)
@@ -334,28 +334,38 @@ classdef TS < handle
                         for i = 1:length(sti)
                             d1 = obj.seg.d (:,sti(i));
                             t1 = obj.seg.t(:,sti(i))-(sti(i)-i) * (1+ tracelength);
-                            s1 = obj.seg.s(:,sti(i))-30;
+                            s1 = obj.seg.s(:,sti(i))-60;
                             plot(t1,d1,'k','LineWidth',1);hold on;
                             plot(t1,s1,'k','LineWidth',1);hold on;
                         end
                     end
                     
                 case 'average'
-                    npat = length (obj.stim.pat);
+                    if isempty(pat)
+                        npat = length (obj.stim.pat);
+                        pat  = obj.stim.pat;
+                    else
+                        npat = length(pat);
+                    end
+                    
                     for i = 1:npat
-                        nsti = length(obj.stim.pat(i).trailN);
+                        patn = pat(i);
+                        nsti = length(obj.stim.pat(patn).trailN);
                         t2   = obj.seg.t(:,i);
-                        s2   = obj.seg.s(:,obj.stim.pat(i).trailN(1))-30;
+                        s2   = obj.seg.s(:,obj.stim.pat(patn).trailN(1));
                         d2   =[];
                         for j = 1:nsti
-                            d2(:,j) = obj.seg.d(:,obj.stim.pat(i).trailN(j));
+                            d2(:,j) = obj.seg.d(:,obj.stim.pat(patn).trailN(j));
                             
                             plot(t2,d2(:,j),'Color',[0.827 0.827 0.827],'LineWidth',1);hold on;
                         end
                         ave = mean(d2,2);
                         plot(t2,ave,'r','LineWidth',1);hold on;
                         plot(t2,s2,'k','LineWidth',1);hold on;
+                        
                     end
+                    
+                    
                     
             end
             
