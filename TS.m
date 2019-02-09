@@ -49,24 +49,54 @@ classdef TS < handle
             obj.stim.threshold = threshold;
             % first, use function detectEvent to detect the onset and offset
             
-            [nsti, startpoint, endpoint] = detectEvent(obj.stim.data(:,1), threshold, 'positive');
+            [~, startpoint, endpoint] = detectEvent(obj.stim.data(:,1), threshold, 'positive');
             
-            % correct stimulus (due to the light stimulus software)
-            
-            for i = 2:nsti
-                if startpoint(i) - endpoint(i-1) < 1 * obj.sr % the interval is less than 1s, due to software
-                    startpoint(i) = endpoint(i) - (endpoint(i-1)-startpoint(i-1));
-                end
-            end 
+%             % correct stimulus (due to the light stimulus software)
+%             
+%             for i = 2:nsti
+%                 if startpoint(i) - endpoint(i-1) < 1 * obj.sr % the interval is less than 1s, due to software
+%                     startpoint(i) = endpoint(i) - (endpoint(i-1)-startpoint(i-1));
+%                 end
+%             end 
             
             obj.stim.startpoint = startpoint;
             obj.stim.endpoint   = endpoint;
             
+%             % generate new stimulus data
+%             obj.stim.data(:,2) = 0;
+%             for n = 1: nsti
+%                 obj.stim.data(startpoint(n):endpoint(n),2)   = 2;
+%             end
+            
+        end
+        
+        function obj = correctSti(obj,sti,amplitude)
+            % function to correct stimulus timing due to software problem
+            
+            % nsti: sti # for correction, e.g., [3,4]
+            % amplitude: sti amplitude for better visulization
+             
+            % define the right stimulus duration as the minimus duration
+            % among those stimuli
+            if ~isempty(sti)
+                duration = min(obj.stim.endpoint-obj.stim.startpoint);
+                % the software always have errors for the startpoints somehow
+                for i = 1: length(sti)
+                    obj.stim.startpoint(sti(i)) = obj.stim.endpoint(sti(i)) - duration;
+                end
+            end
+            
             % generate new stimulus data
             obj.stim.data(:,2) = 0;
-            for n = 1: nsti
-                obj.stim.data(startpoint(n):endpoint(n),2)   = 2;
-            end
+            for n = 1: length(obj.stim.startpoint)
+                obj.stim.data(obj.stim.startpoint(n):obj.stim.endpoint(n),2)   = amplitude;
+                % update stimulus data in seg
+                try
+                obj.seg.s(obj.seg.s~=0)    = amplitude;
+                catch
+                end
+            end 
+            
             
         end
         
@@ -170,11 +200,11 @@ classdef TS < handle
                 % on
                 x1 = obj.seg.si(1,i):obj.seg.si(1,i) + interval;
                 y1 = obj.seg.d(x1);
-                obj.resp.area(1,i) = trapz(x1,y1);
+                obj.resp.area(1,i) = abs(trapz(x1,y1));
                 % off
                 x2 = obj.seg.si(2,i):obj.seg.si(2,i) + interval;
                 y2 = obj.seg.d(x2);
-                obj.resp.area(2,i) = trapz(x2,y2);
+                obj.resp.area(2,i) = abs(trapz(x2,y2));
 
             end
         end
@@ -299,11 +329,7 @@ classdef TS < handle
                 t = (1:1:length(obj.resp.data)) / obj.sr;
                 d = obj.resp.data(:,1);
                 
-                if isfield(obj.stim, 'startpoint')
-                    s = obj.stim.data(:,2);
-                else
-                    s = obj.stim.data(:,1);
-                end
+                s = obj.stim.data(:,size(obj.stim.data,2));
                 plot(t,d,'b',t,s,'r');
                 
                 return;
@@ -324,7 +350,7 @@ classdef TS < handle
                         for i = 1:nsti
                             d1 = obj.seg.d (:,i);
                             t1 = obj.seg.t(:,i);
-                            s1 = obj.seg.s(:,i)-30;
+                            s1 = obj.seg.s(:,i);
                             plot(t1,d1,'k','LineWidth',1);hold on;
                             plot(t1,s1,'k','LineWidth',1);hold on;
                             
@@ -334,7 +360,7 @@ classdef TS < handle
                         for i = 1:length(sti)
                             d1 = obj.seg.d (:,sti(i));
                             t1 = obj.seg.t(:,sti(i))-(sti(i)-i) * (1+ tracelength);
-                            s1 = obj.seg.s(:,sti(i))-60;
+                            s1 = obj.seg.s(:,sti(i));
                             plot(t1,d1,'k','LineWidth',1);hold on;
                             plot(t1,s1,'k','LineWidth',1);hold on;
                         end
@@ -343,7 +369,7 @@ classdef TS < handle
                 case 'average'
                     if isempty(pat)
                         npat = length (obj.stim.pat);
-                        pat  = obj.stim.pat;
+                        pat  = 1:npat;
                     else
                         npat = length(pat);
                     end
@@ -355,8 +381,7 @@ classdef TS < handle
                         s2   = obj.seg.s(:,obj.stim.pat(patn).trailN(1));
                         d2   =[];
                         for j = 1:nsti
-                            d2(:,j) = obj.seg.d(:,obj.stim.pat(patn).trailN(j));
-                            
+                            d2(:,j) = obj.seg.d(:,obj.stim.pat(patn).trailN(j));      
                             plot(t2,d2(:,j),'Color',[0.827 0.827 0.827],'LineWidth',1);hold on;
                         end
                         ave = mean(d2,2);
